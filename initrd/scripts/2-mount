@@ -7,6 +7,52 @@
 # with Android-x86 project.
 #
 
+mount_user_data()
+{    
+    if [ ! -d data/media ]; then
+        mkdir -p data/media
+    fi
+    if [ ! -d data/user ]; then
+        mkdir -p data/user
+    fi
+    if [ -n "$USER_APP" ]; then
+        if [ ! -d "data/data/$USER_APP" ]; then
+            mkdir -p "data/data/$USER_APP"
+        fi
+    fi
+	
+    if [ -n "$USER_DATA" ]; then
+		blk=`basename $USER_DATA`
+		if [ -b "/dev/$blk" ]; then
+			[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+            if [ ! -d mnt/user_data ]; then
+                mkdir -p mnt/user_data
+            fi
+            mount -o noatime /dev/block/$blk mnt/user_data
+            
+            # user data
+            if [ ! -d mnt/user_data/user ]; then
+                mkdir -p mnt/user_data/user
+            fi
+            mount --bind mnt/user_data/user data/user
+            
+            # sdcard data
+            if [ ! -d mnt/user_data/media ]; then
+                mkdir -p mnt/user_data/media
+            fi
+            mount --bind mnt/user_data/media data/media
+            
+            # app data
+            if [ -n "$USER_APP" ]; then
+                if [ ! -d "mnt/user_data/app/$USER_APP" ]; then
+                    mkdir -p "mnt/user_data/app/$USER_APP"
+                fi
+                mount --bind "mnt/user_data/app/$USER_APP" "data/data/$USER_APP"
+            fi
+		fi
+	fi
+}
+
 mount_data()
 {
 	mountpoint -q data && return
@@ -14,6 +60,7 @@ mount_data()
 		blk=`basename $DATA`
 		if [ -b "/dev/$blk" ]; then
 			[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+            # modprobe rbd
 			mount -o noatime /dev/block/$blk data
 		elif [ "$DATA" = "9p" ]; then
 			modprobe 9pnet_virtio
@@ -32,6 +79,8 @@ mount_data()
 	else
 		device_mount_data || mount -t tmpfs tmpfs data
 	fi
+
+    mount_user_data
 }
 
 mount_sdcard()
@@ -58,3 +107,4 @@ mount_sdcard()
 		fi
 	fi
 }
+
